@@ -5,7 +5,7 @@ import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
 const ResetPassword = () => {
-  const API_BASE_URL = "process.env.REACT_APP_API_URL";
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')

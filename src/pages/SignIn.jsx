@@ -5,7 +5,7 @@ import { FaEnvelope } from 'react-icons/fa'
 import { AiFillEyeInvisible, AiFillEye } from 'react-icons/ai'
 
 const SignIn = () => {
-  const API_BASE_URL = "process.env.REACT_APP_API_URL";
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
   const location = useLocation()
   const verified = new URLSearchParams(location.search).get("verified")
 
@@ -68,7 +68,7 @@ const SignIn = () => {
             </label>
             <div className="flex items-center border border-gray-300 rounded px-3 py-2 bg-white">
               <FaEnvelope className="text-gray-500 mr-2" />
-              <input type="email" id="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} className="focus:outline-none w-full text-sm sm:text-base" required/>
+              <input type="email" id="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} className="focus:outline-none w-full text-sm sm:text-base" required />
             </div>
           </div>
 
@@ -80,7 +80,7 @@ const SignIn = () => {
               <span onClick={passwordToggle} className="text-gray-500 mr-2 cursor-pointer">
                 {showPassword ? <AiFillEye /> : <AiFillEyeInvisible />}
               </span>
-              <input type={showPassword ? 'text' : 'password'} id="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} className="focus:outline-none w-full text-sm sm:text-base"required/>
+              <input type={showPassword ? 'text' : 'password'} id="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} className="focus:outline-none w-full text-sm sm:text-base" required />
             </div>
           </div>
 

@@ -5,7 +5,7 @@ import { FaEnvelope } from 'react-icons/fa';
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
-  const API_BASE_URL = "process.env.REACT_APP_API_URL";
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
   const handleSubmit = async e => {
     e.preventDefault();
     setMessage('');

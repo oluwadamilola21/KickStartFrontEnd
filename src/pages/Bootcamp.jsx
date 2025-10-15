@@ -6,7 +6,7 @@ import axios from "axios";
 const userEmail = localStorage.getItem("user_email") || "guest";
 const keyPrefix = `${userEmail}-`;
 
-const API_BASE_URL = "process.env.REACT_APP_API_URL";
+const API_BASE_URL = process.env.REACT_APP_API_URL;
 
 const bootcampLevels = [
   {
@@ -120,7 +120,7 @@ const Bootcamp = () => {
 
     const lessonProgress = progress[lesson.id];
     if (lessonProgress?.position) {
-      player.setCurrentTime(lessonProgress.position).catch(() => {});
+      player.setCurrentTime(lessonProgress.position).catch(() => { });
     }
 
     let lastSaved = 0;
@@ -208,11 +208,10 @@ const Bootcamp = () => {
               <div
                 className="bg-green-500 h-2 rounded-full"
                 style={{
-                  width: `${
-                    (level.lessons.filter((l) => progress[l.id]?.completed).length /
+                  width: `${(level.lessons.filter((l) => progress[l.id]?.completed).length /
                       level.lessons.length) *
                     100
-                  }%`,
+                    }%`,
                 }}
               ></div>
             </div>
@@ -226,9 +225,8 @@ const Bootcamp = () => {
                 return (
                   <div
                     key={lesson.id}
-                    className={`bg-gray-50 p-3 sm:p-4 rounded-lg border ${
-                      !access ? "opacity-50 pointer-events-none" : ""
-                    }`}
+                    className={`bg-gray-50 p-3 sm:p-4 rounded-lg border ${!access ? "opacity-50 pointer-events-none" : ""
+                      }`}
                   >
                     <h4 className="text-sm sm:text-base font-medium">{lesson.title}</h4>
 
@@ -253,9 +251,8 @@ const Bootcamp = () => {
 
                     {access && (
                       <p
-                        className={`mt-2 text-xs sm:text-sm font-semibold ${
-                          isCompleted ? "text-green-600" : "text-gray-600"
-                        }`}
+                        className={`mt-2 text-xs sm:text-sm font-semibold ${isCompleted ? "text-green-600" : "text-gray-600"
+                          }`}
                       >
                         {isCompleted
                           ? "✅ Completed"

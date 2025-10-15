@@ -4,7 +4,7 @@ import { FaEnvelope, FaUser } from 'react-icons/fa'
 import { AiFillEyeInvisible, AiFillEye } from 'react-icons/ai'
 
 const SignUp = () => {
-  const API_BASE_URL = "process.env.REACT_APP_API_URL";
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   const navigate = useNavigate()
   const [username, setUsername] = useState("")
