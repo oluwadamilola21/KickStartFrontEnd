@@ -6,7 +6,7 @@ import axios from "axios";
 const userEmail = localStorage.getItem("user_email") || "guest";
 const keyPrefix = `${userEmail}-`;
 
-const API_BASE_URL = process.env.REACT_APP_API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const bootcampLevels = [
   {
@@ -209,7 +209,7 @@ const Bootcamp = () => {
                 className="bg-green-500 h-2 rounded-full"
                 style={{
                   width: `${(level.lessons.filter((l) => progress[l.id]?.completed).length /
-                      level.lessons.length) *
+                    level.lessons.length) *
                     100
                     }%`,
                 }}

@@ -5,7 +5,8 @@ import { FaEnvelope } from 'react-icons/fa'
 import { AiFillEyeInvisible, AiFillEye } from 'react-icons/ai'
 
 const SignIn = () => {
-  const API_BASE_URL = process.env.REACT_APP_API_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+
   const location = useLocation()
   const verified = new URLSearchParams(location.search).get("verified")
 

@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const VerifyEmail = () => {
-  const API_BASE_URL = process.env.REACT_APP_API_URL;
-  
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+
   const location = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);

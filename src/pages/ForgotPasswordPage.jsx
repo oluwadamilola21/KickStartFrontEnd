@@ -5,7 +5,7 @@ import { FaEnvelope } from 'react-icons/fa';
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
-  const API_BASE_URL = process.env.REACT_APP_API_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
   const handleSubmit = async e => {
     e.preventDefault();
     setMessage('');
@@ -38,7 +38,7 @@ const ForgotPassword = () => {
             </label>
             <div className="flex items-center border border-gray-300 rounded px-3 py-2 bg-white">
               <FaEnvelope className="text-gray-500 mr-2" />
-              <input type="email" id="email" name="email" className="focus:outline-none w-full text-sm sm:text-base" required value={email} onChange={e => setEmail(e.target.value)}/>
+              <input type="email" id="email" name="email" className="focus:outline-none w-full text-sm sm:text-base" required value={email} onChange={e => setEmail(e.target.value)} />
             </div>
           </div>
 
