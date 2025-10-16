@@ -42,7 +42,7 @@ const Bootcamp = () => {
 
   // Fetch saved progress for a lesson
   const fetchProgress = async (lesson) => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("access_token");
     try {
       if (!token) {
         const localProg = localStorage.getItem(`${keyPrefix}lesson-${lesson.id}-progress`);
