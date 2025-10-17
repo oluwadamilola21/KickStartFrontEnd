@@ -40,25 +40,17 @@ const Bootcamp = () => {
   const iframeRefs = useRef({});
   const players = useRef({});
 
-  // Fetch saved progress for a lesson
-  const fetchProgress = async (lesson) => {
-    const token = localStorage.getItem("access_token");
-    try {
-      if (!token) {
-        const localProg = localStorage.getItem(`${keyPrefix}lesson-${lesson.id}-progress`);
-        if (localProg) {
-          setProgress((prev) => ({
-            ...prev,
-            [lesson.id]: JSON.parse(localProg),
-          }));
-        }
-        return;
-      }
+  const token = localStorage.getItem("access_token");
+  const isGuest = !token;
 
+  // Fetch progress for a lesson 
+  const fetchProgress = async (lesson) => {
+    if (isGuest) return; 
+
+    try {
       const res = await axios.get(`${API_BASE_URL}/get/${lesson.vimeoId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       const lessonProgress = res.data || {};
 
       setProgress((prev) => ({
@@ -68,50 +60,42 @@ const Bootcamp = () => {
           completed: lessonProgress.completed || false,
         },
       }));
-
-      localStorage.setItem(
-        `${keyPrefix}lesson-${lesson.id}-progress`,
-        JSON.stringify({
-          position: lessonProgress.progress || 0,
-          completed: lessonProgress.completed || false,
-        })
-      );
     } catch (err) {
       console.error("Error fetching progress:", err);
-
-      const localProg = localStorage.getItem(`${keyPrefix}lesson-${lesson.id}-progress`);
-      if (localProg) {
-        setProgress((prev) => ({
-          ...prev,
-          [lesson.id]: JSON.parse(localProg),
-        }));
-      }
     }
   };
 
-  // Save progress
+  // Save progress 
   const saveProgress = async (lesson, position, markComplete = false) => {
-    const token = localStorage.getItem("access_token");
     const payload = {
       video_id: lesson.vimeoId,
       progress: Math.floor(position),
       completed: markComplete,
     };
 
-    localStorage.setItem(`${keyPrefix}lesson-${lesson.id}-progress`, JSON.stringify(payload));
+    if (!isGuest) {
+      try {
+        const res = await axios.post(`${API_BASE_URL}/save`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-    if (!token) return;
-
-    try {
-      await axios.post(`${API_BASE_URL}/save`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch (err) {
-      console.error("Error saving progress:", err);
+        setProgress((prev) => ({
+          ...prev,
+          [lesson.id]: {
+            position: res.data.progress,
+            completed: res.data.completed,
+          },
+        }));
+      } catch (err) {
+        console.error("Error saving progress:", err);
+      }
+    } else {
+      
+      localStorage.setItem(`${keyPrefix}lesson-${lesson.id}-progress`, JSON.stringify(payload));
     }
   };
 
-  // Player listeners
+  // Attach Vimeo player listeners
   const attachPlayerListeners = (refKey, lesson) => {
     if (players.current[refKey]) return;
 
@@ -120,7 +104,7 @@ const Bootcamp = () => {
 
     const lessonProgress = progress[lesson.id];
     if (lessonProgress?.position) {
-      player.setCurrentTime(lessonProgress.position).catch(() => { });
+      player.setCurrentTime(lessonProgress.position).catch(() => {});
     }
 
     let lastSaved = 0;
@@ -133,12 +117,6 @@ const Bootcamp = () => {
 
     player.on("ended", () => {
       saveProgress(lesson, 0, true);
-      setProgress((prev) => ({
-        ...prev,
-        [lesson.id]: { ...prev[lesson.id], completed: true },
-      }));
-      const completedCount = parseInt(localStorage.getItem("lessonsCompleted") || "0", 10);
-      localStorage.setItem("lessonsCompleted", completedCount + 1);
     });
   };
 
@@ -198,22 +176,26 @@ const Bootcamp = () => {
               <h3 className="text-base sm:text-lg font-bold text-gray-800">
                 Level {level.level}: {level.title}
               </h3>
-              <p className="text-xs sm:text-sm text-gray-600">
-                {level.lessons.filter((l) => progress[l.id]?.completed).length}/
-                {level.lessons.length} completed
-              </p>
+              { !isGuest && (
+                <p className="text-xs sm:text-sm text-gray-600">
+                  {level.lessons.filter((l) => progress[l.id]?.completed).length}/
+                  {level.lessons.length} completed
+                </p>
+              )}
             </div>
 
             <div className="w-full bg-gray-200 h-2 rounded-full">
-              <div
-                className="bg-green-500 h-2 rounded-full"
-                style={{
-                  width: `${(level.lessons.filter((l) => progress[l.id]?.completed).length /
-                    level.lessons.length) *
-                    100
-                    }%`,
-                }}
-              ></div>
+              { !isGuest && (
+                <div
+                  className="bg-green-500 h-2 rounded-full"
+                  style={{
+                    width: `${(level.lessons.filter((l) => progress[l.id]?.completed).length /
+                      level.lessons.length) *
+                      100
+                      }%`,
+                  }}
+                ></div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -225,34 +207,28 @@ const Bootcamp = () => {
                 return (
                   <div
                     key={lesson.id}
-                    className={`bg-gray-50 p-3 sm:p-4 rounded-lg border ${!access ? "opacity-50 pointer-events-none" : ""
-                      }`}
+                    className={`bg-gray-50 p-3 sm:p-4 rounded-lg border ${
+                      !access ? "opacity-50 pointer-events-none" : ""
+                    }`}
                   >
                     <h4 className="text-sm sm:text-base font-medium">{lesson.title}</h4>
 
-                    {access ? (
-                      <div className="aspect-video mt-2 rounded overflow-hidden">
-                        <iframe
-                          ref={(el) => (iframeRefs.current[refKey] = el)}
-                          src={`https://player.vimeo.com/video/${lesson.vimeoId}?badge=0&autopause=0&app_id=58479`}
-                          className="w-full h-full"
-                          frameBorder="0"
-                          allow="autoplay; fullscreen; picture-in-picture"
-                          title={lesson.title}
-                        ></iframe>
-                      </div>
-                    ) : (
-                      <div className="aspect-video mt-2 rounded bg-gray-300 flex items-center justify-center">
-                        <p className="text-xs sm:text-sm text-gray-700 text-center px-2">
-                          Unlock previous lesson first
-                        </p>
-                      </div>
-                    )}
+                    <div className="aspect-video mt-2 rounded overflow-hidden">
+                      <iframe
+                        ref={(el) => (iframeRefs.current[refKey] = el)}
+                        src={`https://player.vimeo.com/video/${lesson.vimeoId}?badge=0&autopause=0&app_id=58479`}
+                        className="w-full h-full"
+                        frameBorder="0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        title={lesson.title}
+                      ></iframe>
+                    </div>
 
-                    {access && (
+                    { !isGuest && (
                       <p
-                        className={`mt-2 text-xs sm:text-sm font-semibold ${isCompleted ? "text-green-600" : "text-gray-600"
-                          }`}
+                        className={`mt-2 text-xs sm:text-sm font-semibold ${
+                          isCompleted ? "text-green-600" : "text-gray-600"
+                        }`}
                       >
                         {isCompleted
                           ? "✅ Completed"
