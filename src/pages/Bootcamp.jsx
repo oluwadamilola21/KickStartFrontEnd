@@ -38,6 +38,7 @@ const Bootcamp = () => {
   const [progress, setProgress] = useState({});
   const [allProgressFetched, setAllProgressFetched] = useState(false);
   const iframeRefs = useRef({});
+  // players.current[refKey] = { player, completed, lastSaved, handlers }
   const players = useRef({});
 
   const token = localStorage.getItem("access_token");
@@ -56,8 +57,12 @@ const Bootcamp = () => {
       setProgress((prev) => ({
         ...prev,
         [lesson.id]: {
-          position: lessonProgress.progress || 0,
-          completed: lessonProgress.completed || false,
+          // allow 0 explicitly
+          position:
+            typeof lessonProgress.progress === "number"
+              ? lessonProgress.progress
+              : 0,
+          completed: !!lessonProgress.completed,
         },
       }));
     } catch (err) {
@@ -73,61 +78,164 @@ const Bootcamp = () => {
       completed: markComplete,
     };
 
-    if (!isGuest) {
-      try {
-        const res = await axios.post(`${API_BASE_URL}/save`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+    // if guest: persist in localStorage
+    if (isGuest) {
+      localStorage.setItem(
+        `${keyPrefix}lesson-${lesson.id}-progress`,
+        JSON.stringify(payload)
+      );
+      // update UI for guests too
+      setProgress((prev) => ({
+        ...prev,
+        [lesson.id]: {
+          position: payload.progress,
+          completed: markComplete || prev[lesson.id]?.completed || false,
+        },
+      }));
+      return;
+    }
 
-        // Update UI immediately
+    // For logged-in users: POST to backend
+    try {
+      // optimistic UI update if marking complete
+      if (markComplete) {
         setProgress((prev) => ({
           ...prev,
           [lesson.id]: {
-            position: res.data.progress,
-            completed: res.data.completed,
+            position: Math.floor(position),
+            completed: true,
           },
         }));
-      } catch (err) {
-        console.error("Error saving progress:", err);
       }
-    } else {
-      localStorage.setItem(`${keyPrefix}lesson-${lesson.id}-progress`, JSON.stringify(payload));
+
+      const res = await axios.post(`${API_BASE_URL}/save`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // server response may contain canonical progress/completed fields
+      if (res && res.data) {
+        setProgress((prev) => ({
+          ...prev,
+          [lesson.id]: {
+            position:
+              typeof res.data.progress === "number"
+                ? res.data.progress
+                : Math.floor(position),
+            completed:
+              typeof res.data.completed === "boolean"
+                ? res.data.completed
+                : markComplete || prev[lesson.id]?.completed || false,
+          },
+        }));
+      }
+    } catch (err) {
+      console.error("Error saving progress:", err);
+      // don't revert optimistic UI for markComplete, but you could show an error toast
     }
   };
 
   // Attach Vimeo player listeners
   const attachPlayerListeners = (refKey, lesson) => {
-    if (players.current[refKey]) return;
+    // already attached
+    if (players.current[refKey]?.player) return;
 
-    const player = new Player(iframeRefs.current[refKey]);
-    players.current[refKey] = player;
+    const iframeEl = iframeRefs.current[refKey];
+    if (!iframeEl) return;
 
+    const player = new Player(iframeEl);
+    // prepare wrapper object
+    players.current[refKey] = {
+      player,
+      completed: false, // local flag to avoid overwrites
+      lastSaved: 0,
+      handlers: {},
+    };
+
+    // restore saved time if available (allow 0)
     const lessonProgress = progress[lesson.id];
-    if (lessonProgress?.position) {
-      player.setCurrentTime(lessonProgress.position).catch(() => { });
+    if (lessonProgress && typeof lessonProgress.position === "number") {
+      player
+        .setCurrentTime(lessonProgress.position)
+        .catch((err) => {
+          // sometimes setting 0 causes a rejection; ignore
+          // console.debug("setCurrentTime rejected:", err);
+        });
     }
 
-    let lastSaved = 0;
-    player.on("timeupdate", (data) => {
-      if (data.seconds - lastSaved >= 10) {
-        lastSaved = data.seconds;
-        saveProgress(lesson, data.seconds, false);
+    // timeupdate handler
+    const timeUpdateHandler = (data) => {
+      // if we've already marked this player completed, ignore further updates
+      if (players.current[refKey].completed) return;
+
+      const secs = Math.floor(data.seconds);
+      // only save every 10 seconds (or if lastSaved is 0)
+      if (secs - players.current[refKey].lastSaved >= 10) {
+        players.current[refKey].lastSaved = secs;
+        // save progress (non-final)
+        saveProgress(lesson, secs, false);
       }
-    });
+    };
 
-    player.on("ended", () => {
-      // Update progress optimistically
-      setProgress((prev) => ({
-        ...prev,
-        [lesson.id]: {
-          position: prev[lesson.id]?.position || 0,
-          completed: true,
-        },
-      }));
-      saveProgress(lesson, 0, true);
-    });
+    // ended handler - use duration as final progress and set completed
+    const endedHandler = async () => {
+      try {
+        const dur = await player.getDuration();
+        // mark local as completed to prevent timeupdate overwriting
+        players.current[refKey].completed = true;
 
+        // update UI optimistically
+        setProgress((prev) => ({
+          ...prev,
+          [lesson.id]: {
+            position: Math.floor(dur),
+            completed: true,
+          },
+        }));
+
+        // save final progress using duration and completed flag
+        await saveProgress(lesson, dur, true);
+      } catch (err) {
+        console.error("Error handling ended:", err);
+        // fallback: mark completed with 0 if something fails
+        players.current[refKey].completed = true;
+        setProgress((prev) => ({
+          ...prev,
+          [lesson.id]: {
+            position: prev[lesson.id]?.position || 0,
+            completed: true,
+          },
+        }));
+        saveProgress(lesson, 0, true);
+      }
+    };
+
+    // store handlers so we can remove later if needed
+    players.current[refKey].handlers = {
+      timeUpdateHandler,
+      endedHandler,
+    };
+
+    player.on("timeupdate", timeUpdateHandler);
+    player.on("ended", endedHandler);
   };
+
+  // cleanup function if component unmounts (remove listeners)
+  useEffect(() => {
+    return () => {
+      Object.keys(players.current).forEach((refKey) => {
+        const entry = players.current[refKey];
+        if (entry && entry.player && entry.handlers) {
+          try {
+            entry.player.off("timeupdate", entry.handlers.timeUpdateHandler);
+            entry.player.off("ended", entry.handlers.endedHandler);
+          } catch (e) {
+            // ignore
+          }
+        }
+      });
+      players.current = {};
+    };
+  }, []);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -139,7 +247,8 @@ const Bootcamp = () => {
       setAllProgressFetched(true);
     };
     fetchAll();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
   // Attach players once after all progress fetched
   useEffect(() => {
@@ -151,7 +260,8 @@ const Bootcamp = () => {
         if (el) attachPlayerListeners(refKey, lesson);
       });
     });
-  }, [allProgressFetched]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProgressFetched, progress]); // note: progress in deps ensures restored time gets applied if fetchProgress resolves later
 
   const canAccessLesson = (levelIndex, lessonIndex) => {
     if (levelIndex === 0 && lessonIndex === 0) return true;
@@ -202,10 +312,11 @@ const Bootcamp = () => {
                 <div
                   className="bg-green-500 h-2 rounded-full"
                   style={{
-                    width: `${(level.lessons.filter((l) => progress[l.id]?.completed).length /
-                      level.lessons.length) *
+                    width: `${
+                      (level.lessons.filter((l) => progress[l.id]?.completed).length /
+                        level.lessons.length) *
                       100
-                      }%`,
+                    }%`,
                   }}
                 ></div>
               )}
