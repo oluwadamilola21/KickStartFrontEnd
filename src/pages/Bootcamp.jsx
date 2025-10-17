@@ -43,9 +43,9 @@ const Bootcamp = () => {
   const token = localStorage.getItem("access_token");
   const isGuest = !token;
 
-  // Fetch progress for a lesson 
+  // Fetch progress for a lesson
   const fetchProgress = async (lesson) => {
-    if (isGuest) return; 
+    if (isGuest) return;
 
     try {
       const res = await axios.get(`${API_BASE_URL}/get/${lesson.vimeoId}`, {
@@ -65,7 +65,7 @@ const Bootcamp = () => {
     }
   };
 
-  // Save progress 
+  // Save progress
   const saveProgress = async (lesson, position, markComplete = false) => {
     const payload = {
       video_id: lesson.vimeoId,
@@ -79,6 +79,7 @@ const Bootcamp = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
+        // Update UI immediately
         setProgress((prev) => ({
           ...prev,
           [lesson.id]: {
@@ -90,7 +91,6 @@ const Bootcamp = () => {
         console.error("Error saving progress:", err);
       }
     } else {
-      
       localStorage.setItem(`${keyPrefix}lesson-${lesson.id}-progress`, JSON.stringify(payload));
     }
   };
@@ -104,7 +104,7 @@ const Bootcamp = () => {
 
     const lessonProgress = progress[lesson.id];
     if (lessonProgress?.position) {
-      player.setCurrentTime(lessonProgress.position).catch(() => {});
+      player.setCurrentTime(lessonProgress.position).catch(() => { });
     }
 
     let lastSaved = 0;
@@ -116,8 +116,17 @@ const Bootcamp = () => {
     });
 
     player.on("ended", () => {
+      // Update progress optimistically
+      setProgress((prev) => ({
+        ...prev,
+        [lesson.id]: {
+          position: prev[lesson.id]?.position || 0,
+          completed: true,
+        },
+      }));
       saveProgress(lesson, 0, true);
     });
+
   };
 
   useEffect(() => {
@@ -132,6 +141,7 @@ const Bootcamp = () => {
     fetchAll();
   }, []);
 
+  // Attach players once after all progress fetched
   useEffect(() => {
     if (!allProgressFetched) return;
     bootcampLevels.forEach((level) => {
@@ -141,14 +151,17 @@ const Bootcamp = () => {
         if (el) attachPlayerListeners(refKey, lesson);
       });
     });
-  }, [allProgressFetched, progress]);
+  }, [allProgressFetched]);
 
   const canAccessLesson = (levelIndex, lessonIndex) => {
     if (levelIndex === 0 && lessonIndex === 0) return true;
+
     const prevLesson =
       bootcampLevels[levelIndex].lessons[lessonIndex - 1] ||
       bootcampLevels[levelIndex - 1]?.lessons?.slice(-1)[0];
-    return prevLesson ? progress[prevLesson.id]?.completed : false;
+
+    if (!prevLesson) return false;
+    return progress[prevLesson.id]?.completed === true;
   };
 
   return (
@@ -176,7 +189,7 @@ const Bootcamp = () => {
               <h3 className="text-base sm:text-lg font-bold text-gray-800">
                 Level {level.level}: {level.title}
               </h3>
-              { !isGuest && (
+              {!isGuest && (
                 <p className="text-xs sm:text-sm text-gray-600">
                   {level.lessons.filter((l) => progress[l.id]?.completed).length}/
                   {level.lessons.length} completed
@@ -185,7 +198,7 @@ const Bootcamp = () => {
             </div>
 
             <div className="w-full bg-gray-200 h-2 rounded-full">
-              { !isGuest && (
+              {!isGuest && (
                 <div
                   className="bg-green-500 h-2 rounded-full"
                   style={{
@@ -207,9 +220,8 @@ const Bootcamp = () => {
                 return (
                   <div
                     key={lesson.id}
-                    className={`bg-gray-50 p-3 sm:p-4 rounded-lg border ${
-                      !access ? "opacity-50 pointer-events-none" : ""
-                    }`}
+                    className={`bg-gray-50 p-3 sm:p-4 rounded-lg border ${!access ? "opacity-50 pointer-events-none" : ""
+                      }`}
                   >
                     <h4 className="text-sm sm:text-base font-medium">{lesson.title}</h4>
 
@@ -224,11 +236,10 @@ const Bootcamp = () => {
                       ></iframe>
                     </div>
 
-                    { !isGuest && (
+                    {!isGuest && (
                       <p
-                        className={`mt-2 text-xs sm:text-sm font-semibold ${
-                          isCompleted ? "text-green-600" : "text-gray-600"
-                        }`}
+                        className={`mt-2 text-xs sm:text-sm font-semibold ${isCompleted ? "text-green-600" : "text-gray-600"
+                          }`}
                       >
                         {isCompleted
                           ? "✅ Completed"
